@@ -3,6 +3,8 @@ const express = require('express');
 const router = express.Router();
 const { getAutoReply } = require('./responses');
 const { getAIReply, detectIntent, detectSentiment } = require('./ai');
+const { getProductRecommendations, formatProductReply } = require('./recommendation');
+const { getUpsellSuggestions, formatUpsellMessage } = require('./upselling');
 const axios = require('axios');
 
 // Webhook Verification
@@ -26,6 +28,8 @@ router.post('/', async (req, res) => {
 
   if (body.object === 'instagram') {
     for (const entry of body.entry) {
+
+      // messaging array
       if (entry.messaging) {
         for (const event of entry.messaging) {
           if (event.message && event.message.text) {
@@ -33,17 +37,52 @@ router.post('/', async (req, res) => {
             const messageText = event.message.text;
             console.log(`Message from ${senderId}: ${messageText}`);
 
-            // Intent & Sentiment Detection
             const intent = await detectIntent(messageText);
             const sentiment = await detectSentiment(messageText);
             console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
 
-            let reply = await getAIReply(messageText);
+            // Product Recommendation Check
+            const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
+              'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
+              'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
+              'eid', 'party'];
+            const isProductQuery = productKeywords.some(k =>
+              messageText.toLowerCase().includes(k)
+            );
+
+            let reply;
+            if (isProductQuery) {
+              const products = await getProductRecommendations(messageText);
+              if (products.length > 0) {
+                reply = formatProductReply(products, messageText);
+              }
+            }
+
+            if (!reply) reply = await getAIReply(messageText);
             if (!reply) reply = getAutoReply(messageText);
+
             await sendMessage(senderId, reply);
+
+            // Auto Upselling
+            const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
+              'jeans', 'handbag', 'shoes', 'frock'];
+            const isUpsellProduct = upsellKeywords.some(k =>
+              messageText.toLowerCase().includes(k)
+            );
+            if (isUpsellProduct) {
+              const suggestions = getUpsellSuggestions(messageText);
+              const upsellMsg = formatUpsellMessage(messageText, suggestions);
+              if (upsellMsg) {
+                setTimeout(async () => {
+                  await sendMessage(senderId, upsellMsg);
+                }, 2000);
+              }
+            }
           }
         }
       }
+
+      // changes array
       if (entry.changes) {
         for (const change of entry.changes) {
           if (change.field === 'messages') {
@@ -53,14 +92,47 @@ router.post('/', async (req, res) => {
               const messageText = msg.message.text;
               console.log(`Message from ${senderId}: ${messageText}`);
 
-              // Intent & Sentiment Detection
               const intent = await detectIntent(messageText);
               const sentiment = await detectSentiment(messageText);
               console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
 
-              let reply = await getAIReply(messageText);
+              // Product Recommendation Check
+              const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
+                'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
+                'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
+                'eid', 'party'];
+              const isProductQuery = productKeywords.some(k =>
+                messageText.toLowerCase().includes(k)
+              );
+
+              let reply;
+              if (isProductQuery) {
+                const products = await getProductRecommendations(messageText);
+                if (products.length > 0) {
+                  reply = formatProductReply(products, messageText);
+                }
+              }
+
+              if (!reply) reply = await getAIReply(messageText);
               if (!reply) reply = getAutoReply(messageText);
+
               await sendMessage(senderId, reply);
+
+              // Auto Upselling
+              const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
+                'jeans', 'handbag', 'shoes', 'frock'];
+              const isUpsellProduct = upsellKeywords.some(k =>
+                messageText.toLowerCase().includes(k)
+              );
+              if (isUpsellProduct) {
+                const suggestions = getUpsellSuggestions(messageText);
+                const upsellMsg = formatUpsellMessage(messageText, suggestions);
+                if (upsellMsg) {
+                  setTimeout(async () => {
+                    await sendMessage(senderId, upsellMsg);
+                  }, 2000);
+                }
+              }
             }
           }
         }
