@@ -21,6 +21,19 @@ router.get('/', (req, res) => {
   }
 });
 
+// n8n Workflow Call
+async function callN8nWorkflow(senderId, messageText) {
+  try {
+    await axios.post(
+      'https://haroonriaz.app.n8n.cloud/webhook/fashionhub-bot',
+      { sender: senderId, message: messageText }
+    );
+    console.log('n8n workflow triggered!');
+  } catch (error) {
+    console.error('n8n error:', error.message);
+  }
+}
+
 // Receive Messages
 router.post('/', async (req, res) => {
   const body = req.body;
@@ -37,11 +50,13 @@ router.post('/', async (req, res) => {
             const messageText = event.message.text;
             console.log(`Message from ${senderId}: ${messageText}`);
 
+            // Trigger n8n workflow
+            await callN8nWorkflow(senderId, messageText);
+
             const intent = await detectIntent(messageText);
             const sentiment = await detectSentiment(messageText);
             console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
 
-            // Product Recommendation Check
             const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
               'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
               'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
@@ -63,7 +78,6 @@ router.post('/', async (req, res) => {
 
             await sendMessage(senderId, reply);
 
-            // Auto Upselling
             const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
               'jeans', 'handbag', 'shoes', 'frock'];
             const isUpsellProduct = upsellKeywords.some(k =>
@@ -92,11 +106,13 @@ router.post('/', async (req, res) => {
               const messageText = msg.message.text;
               console.log(`Message from ${senderId}: ${messageText}`);
 
+              // Trigger n8n workflow
+              await callN8nWorkflow(senderId, messageText);
+
               const intent = await detectIntent(messageText);
               const sentiment = await detectSentiment(messageText);
               console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
 
-              // Product Recommendation Check
               const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
                 'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
                 'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
@@ -118,7 +134,6 @@ router.post('/', async (req, res) => {
 
               await sendMessage(senderId, reply);
 
-              // Auto Upselling
               const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
                 'jeans', 'handbag', 'shoes', 'frock'];
               const isUpsellProduct = upsellKeywords.some(k =>
