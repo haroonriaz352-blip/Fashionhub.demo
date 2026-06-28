@@ -21,19 +21,6 @@ router.get('/', (req, res) => {
   }
 });
 
-// n8n Workflow Call
-async function callN8nWorkflow(senderId, messageText) {
-  try {
-    await axios.post(
-      'https://haroonriaz.app.n8n.cloud/webhook/fashionhub-bot',
-      { sender: senderId, message: messageText }
-    );
-    console.log('n8n workflow triggered!');
-  } catch (error) {
-    console.error('n8n error:', error.message);
-  }
-}
-
 // Receive Messages
 router.post('/', async (req, res) => {
   const body = req.body;
@@ -49,9 +36,6 @@ router.post('/', async (req, res) => {
             const senderId = event.sender.id;
             const messageText = event.message.text;
             console.log(`Message from ${senderId}: ${messageText}`);
-
-            // Trigger n8n workflow
-            await callN8nWorkflow(senderId, messageText);
 
             const intent = await detectIntent(messageText);
             const sentiment = await detectSentiment(messageText);
@@ -105,9 +89,6 @@ router.post('/', async (req, res) => {
               const senderId = msg.sender.id;
               const messageText = msg.message.text;
               console.log(`Message from ${senderId}: ${messageText}`);
-
-              // Trigger n8n workflow
-              await callN8nWorkflow(senderId, messageText);
 
               const intent = await detectIntent(messageText);
               const sentiment = await detectSentiment(messageText);
@@ -164,7 +145,7 @@ router.post('/', async (req, res) => {
 async function sendMessage(recipientId, message) {
   try {
     await axios.post(
-      `https://graph.facebook.com/v21.0/me/messages`,
+      `https://graph.facebook.com/v21.0/${process.env.INSTAGRAM_ACCOUNT_ID}/messages`,
       {
         recipient: { id: recipientId },
         message: { text: message }
