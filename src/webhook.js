@@ -1,11 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const router = express.Router();
-const { getAutoReply } = require('./responses');
-const { getAIReply, detectIntent, detectSentiment } = require('./ai');
-const { getProductRecommendations, formatProductReply } = require('./recommendation');
-const { getUpsellSuggestions, formatUpsellMessage } = require('./upselling');
 const axios = require('axios');
+
+const N8N_WEBHOOK_URL = 'https://haroonriaz.app.n8n.cloud/webhook/fashionhub-bot';
 
 // Webhook Verification
 router.get('/', (req, res) => {
@@ -21,143 +19,21 @@ router.get('/', (req, res) => {
   }
 });
 
-// Receive Messages
+// Receive Messages aur N8N ko forward karo
 router.post('/', async (req, res) => {
   const body = req.body;
   console.log('Webhook received:', JSON.stringify(body, null, 2));
 
-  if (body.object === 'instagram') {
-    for (const entry of body.entry) {
+  // Pehle Meta ko 200 OK do
+  res.sendStatus(200);
 
-      // messaging array
-      if (entry.messaging) {
-        for (const event of entry.messaging) {
-          if (event.message && event.message.text) {
-            const senderId = event.sender.id;
-            const messageText = event.message.text;
-            console.log(`Message from ${senderId}: ${messageText}`);
-
-            const intent = await detectIntent(messageText);
-            const sentiment = await detectSentiment(messageText);
-            console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
-
-            const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
-              'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
-              'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
-              'eid', 'party'];
-            const isProductQuery = productKeywords.some(k =>
-              messageText.toLowerCase().includes(k)
-            );
-
-            let reply;
-            if (isProductQuery) {
-              const products = await getProductRecommendations(messageText);
-              if (products.length > 0) {
-                reply = formatProductReply(products, messageText);
-              }
-            }
-
-            if (!reply) reply = await getAIReply(messageText);
-            if (!reply) reply = getAutoReply(messageText);
-
-            await sendMessage(senderId, reply);
-
-            const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
-              'jeans', 'handbag', 'shoes', 'frock'];
-            const isUpsellProduct = upsellKeywords.some(k =>
-              messageText.toLowerCase().includes(k)
-            );
-            if (isUpsellProduct) {
-              const suggestions = getUpsellSuggestions(messageText);
-              const upsellMsg = formatUpsellMessage(messageText, suggestions);
-              if (upsellMsg) {
-                setTimeout(async () => {
-                  await sendMessage(senderId, upsellMsg);
-                }, 2000);
-              }
-            }
-          }
-        }
-      }
-
-      // changes array
-      if (entry.changes) {
-        for (const change of entry.changes) {
-          if (change.field === 'messages') {
-            const msg = change.value;
-            if (msg && msg.message && msg.sender) {
-              const senderId = msg.sender.id;
-              const messageText = msg.message.text;
-              console.log(`Message from ${senderId}: ${messageText}`);
-
-              const intent = await detectIntent(messageText);
-              const sentiment = await detectSentiment(messageText);
-              console.log(`Intent: ${intent} | Sentiment: ${sentiment}`);
-
-              const productKeywords = ['dress', 'shirt', 'kurta', 'maxi', 'frock',
-                'handbag', 'shoes', 'black', 'red', 'blue', 'under 2000', 'under 3000',
-                'under 5000', 'cheap', 'sasta', 'formal', 'casual', 'summer', 'winter',
-                'eid', 'party'];
-              const isProductQuery = productKeywords.some(k =>
-                messageText.toLowerCase().includes(k)
-              );
-
-              let reply;
-              if (isProductQuery) {
-                const products = await getProductRecommendations(messageText);
-                if (products.length > 0) {
-                  reply = formatProductReply(products, messageText);
-                }
-              }
-
-              if (!reply) reply = await getAIReply(messageText);
-              if (!reply) reply = getAutoReply(messageText);
-
-              await sendMessage(senderId, reply);
-
-              const upsellKeywords = ['black dress', 'maxi', 'shirt', 'kurta',
-                'jeans', 'handbag', 'shoes', 'frock'];
-              const isUpsellProduct = upsellKeywords.some(k =>
-                messageText.toLowerCase().includes(k)
-              );
-              if (isUpsellProduct) {
-                const suggestions = getUpsellSuggestions(messageText);
-                const upsellMsg = formatUpsellMessage(messageText, suggestions);
-                if (upsellMsg) {
-                  setTimeout(async () => {
-                    await sendMessage(senderId, upsellMsg);
-                  }, 2000);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    res.sendStatus(200);
-  } else {
-    console.log('Other webhook:', JSON.stringify(body, null, 2));
-    res.sendStatus(200);
+  try {
+    // N8N ko forward karo
+    await axios.post(N8N_WEBHOOK_URL, body);
+    console.log('Forwarded to N8N successfully');
+  } catch (error) {
+    console.error('Error forwarding to N8N:', error.message);
   }
 });
-
-// Send Message Function
-async function sendMessage(recipientId, message) {
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v21.0/${process.env.INSTAGRAM_ACCOUNT_ID}/messages`,
-      {
-        recipient: { id: recipientId },
-        message: { text: message }
-      },
-      {
-        params: { access_token: process.env.PAGE_ACCESS_TOKEN }
-      }
-    );
-    console.log(`Reply sent to ${recipientId}`);
-  } catch (error) {
-    console.error('Error sending message:', error.response?.data || error.message);
-  }
-}
 
 module.exports = router;
