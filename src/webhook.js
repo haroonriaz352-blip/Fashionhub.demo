@@ -27,6 +27,16 @@ router.post('/', async (req, res) => {
   // Pehle Meta ko 200 OK do
   res.sendStatus(200);
 
+  // Sirf actual text messages forward karo, read/delivery/reaction events skip karo
+  const hasTextMessage = body.entry?.some(entry =>
+    entry.messaging?.some(m => m.message && m.message.text)
+  );
+
+  if (!hasTextMessage) {
+    console.log('Skipping non-text event (read/delivery/reaction)');
+    return;
+  }
+
   try {
     // N8N ko forward karo
     await axios.post(N8N_WEBHOOK_URL, body);
