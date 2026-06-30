@@ -27,10 +27,12 @@ router.post('/', async (req, res) => {
   // Pehle Meta ko 200 OK do
   res.sendStatus(200);
 
-  // Sirf actual text messages forward karo, read/delivery/reaction events skip karo
-  const hasTextMessage = body.entry?.some(entry =>
-    entry.messaging?.some(m => m.message && m.message.text)
-  );
+  // Sirf actual text messages forward karo (messaging ya changes dono format support)
+  const hasTextMessage = body.entry?.some(entry => {
+    const inMessaging = entry.messaging?.some(m => m.message && m.message.text);
+    const inChanges = entry.changes?.some(c => c.field === 'messages' && c.value?.message?.text);
+    return inMessaging || inChanges;
+  });
 
   if (!hasTextMessage) {
     console.log('Skipping non-text event (read/delivery/reaction)');
