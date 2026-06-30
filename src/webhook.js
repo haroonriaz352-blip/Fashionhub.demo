@@ -1,50 +1,29 @@
 require('dotenv').config();
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 
-const N8N_WEBHOOK_URL = 'https://haroonriaz.app.n8n.cloud/webhook/fashionhub-bot';
-
-// Webhook Verification
-router.get('/', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
-    console.log('Webhook verified!');
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
-// Receive Messages aur N8N ko forward karo
-router.post('/', async (req, res) => {
-  const body = req.body;
-  console.log('Webhook received:', JSON.stringify(body, null, 2));
-
-  // Pehle Meta ko 200 OK do
-  res.sendStatus(200);
-
-  // Sirf actual text messages forward karo (messaging ya changes dono format support)
-  const hasTextMessage = body.entry?.some(entry => {
-    const inMessaging = entry.messaging?.some(m => m.message && m.message.text);
-    const inChanges = entry.changes?.some(c => c.field === 'messages' && c.value?.message?.text);
-    return inMessaging || inChanges;
-  });
-
-  if (!hasTextMessage) {
-    console.log('Skipping non-text event (read/delivery/reaction)');
-    return;
-  }
-
+// N8N se aane wale processed messages ko save karna (dashboard ke liye)
+// N8N workflow ke end mein ek HTTP Request node se ye route call hoga
+router.post('/log', async (req, res) => {
   try {
-    // N8N ko forward karo
-    await axios.post(N8N_WEBHOOK_URL, body);
-    console.log('Forwarded to N8N successfully');
+    const { senderId, customerMessage, botReply, timestamp } = req.body;
+
+    console.log('Logging conversation:', { senderId, customerMessage, botReply });
+
+    // TODO: Yahan apna Mongoose model use karke MongoDB mein save karo
+    // Example (apne Customer/Order models ki tarah ek "Conversation" model bana sakte ho):
+    //
+    // await Conversation.create({
+    //   senderId,
+    //   customerMessage,
+    //   botReply,
+    //   timestamp: timestamp || new Date()
+    // });
+
+    res.status(200).json({ status: 'logged' });
   } catch (error) {
-    console.error('Error forwarding to N8N:', error.message);
+    console.error('Error logging conversation:', error.message);
+    res.status(500).json({ error: 'Failed to log conversation' });
   }
 });
 
